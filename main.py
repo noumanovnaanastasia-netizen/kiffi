@@ -11,7 +11,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 bot = TeleBot(BOT_TOKEN)
 
 # Твой баннер и официальные ссылки проекта
-URL_MAIN_IMG = "https://placehold.co"
+URL_MAIN_IMG = "https://t.me/banerss777/7"
 URL_INSTRUCTION_POST = "https://t.me/kiffissT/2"
 URL_AGREE = "https://telegra.ph"
 
