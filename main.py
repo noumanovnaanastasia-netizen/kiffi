@@ -15,9 +15,9 @@ bot = TeleBot(BOT_TOKEN)
 URL_MAIN_IMG = "https://placehold.co"
 
 # Твои точные ссылки на статьи в Telegraph
-URL_IOS = "https://telegra.ph"
-URL_ANDROID = "https://telegra.ph"
-URL_AGREE = "https://telegra.ph"
+URL_IOS = "https://telegra.ph/Podrobnaya-instrukciya-dlya-iOS-iPhone--iPad-09-10"
+URL_ANDROID = "https://telegra.ph/Podrobnaya-instrukciya-dlya-Android-09-10"
+URL_AGREE = "https://telegra.ph/Polzovatelskoe-soglashenie-i-Politika-konfidencialnosti-Kiffis-Tunnel-09-10"
 
 
 # --- ВЕБ-СЕРВЕР ДЛЯ RENDER ---
