@@ -1,23 +1,23 @@
-import asyncio
 import os
 import logging
-from aiogram import Bot, Dispatcher, types
-from aiogram.filters import Command
+from telebot import TeleBot, types
 
+# Включаем логи, чтобы всё видеть
 logging.basicConfig(level=logging.INFO)
 
-# Токен будем брать из настроек хостинга, чтобы не «палить» его в коде
+# Получаем токен из настроек Render
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-bot = Bot(token=BOT_TOKEN)
-dp = Dispatcher()
+bot = TeleBot(BOT_TOKEN)
 
-@dp.message(Command("start"))
-async def cmd_start(message: types.Message):
-    await message.answer("🔮 Привет! Новый Kiffis Tunnel успешно запущен с нуля!")
-
-async def main():
-    logging.info("Бот запускается...")
-    await dp.start_polling(bot)
+# Обработка команды /start
+@bot.message_handler(commands=['start'])
+def cmd_start(message):
+    bot.send_message(
+        message.chat.id, 
+        "🔮 Привет! Новый Kiffis Tunnel успешно запущен на ультра-лёгком движке!"
+    )
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    logging.info("Бот Kiffis Tunnel запускается...")
+    # Запуск постоянного опроса сервера Telegram
+    bot.infinity_polling()
