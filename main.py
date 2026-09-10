@@ -10,10 +10,22 @@ logging.basicConfig(level=logging.INFO)
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 bot = TeleBot(BOT_TOKEN)
 
-# Твой баннер и официальные ссылки проекта
+
+# =====================================================================
+#  ⚙️ ТВОИ ССЫЛКИ ДЛЯ НАСТРОЙКИ (МЕНЯЙ ССЫЛКИ ВНУТРИ КАВЫЧЕК 👇)
+# =====================================================================
+
+# 1. Твой ГЛАВНЫЙ баннер (который показывается при команде /start)
 URL_MAIN_IMG = "https://t.me/banerss777/9"
+
+# 2. Твои ссылки на статьи и посты
 URL_INSTRUCTION_POST = "https://t.me/kiffissT/2"
 URL_AGREE = "https://t.me/kiffissT/2"
+
+# 3. Ссылка на твоего ОТДЕЛЬНОГО бота поддержки (замени юзернейм на своего)
+URL_HELP_BOT = "https://t.me/helpkifis_bot"
+
+# =====================================================================
 
 
 # --- ВЕБ-СЕРВЕР ДЛЯ RENDER ---
@@ -46,13 +58,13 @@ def cmd_start(message):
     btn_combo = types.InlineKeyboardButton("🔄 VPN + БС (Комбо)", callback_data="menu_combo")
     markup.row(btn_wl, btn_combo)
     
-    # 3 ряд: Прямая ссылка на инструкцию в канале и Промокоды
+    # 3 ряд: Инструкция и Промокоды
     btn_ins = types.InlineKeyboardButton("📖 Инструкция", url=URL_INSTRUCTION_POST) 
     btn_promo = types.InlineKeyboardButton("🎟 Промокоды", callback_data="menu_promo")
     markup.row(btn_ins, btn_promo)
     
-    # 4 ряд: Помощь и Соглашение
-    btn_help = types.InlineKeyboardButton("🆘 Помощь", callback_data="menu_help")
+    # 4 ряд: Помощь (теперь ведет прямо в бота поддержки) и Соглашение
+    btn_help = types.InlineKeyboardButton("🆘 Помощь", url=URL_HELP_BOT)
     btn_agree = types.InlineKeyboardButton("📄 Соглашение", url=URL_AGREE)
     markup.row(btn_help, btn_agree)
     
@@ -68,16 +80,13 @@ def cmd_start(message):
 # --- ОБРАБОТКА НАЖАТИЙ (ДЛЯ ОСТАЛЬНЫХ КНОПОК) ---
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callbacks(call):
-    # Заглушка, чтобы кнопки без ссылок не зависали при нажатии
     bot.answer_callback_query(call.id, text="Эта функция в разработке 🛠")
 
 
 if __name__ == "__main__":
-    # 1. Запуск фонового веб-сервера
     web_thread = threading.Thread(target=run_web_server, daemon=True)
     web_thread.start()
     
-    # 2. Сброс старых зависших вебхуков перед стартом
     logging.info("Сброс старых сессий Telegram...")
     try:
         bot.remove_webhook()
@@ -87,6 +96,4 @@ if __name__ == "__main__":
     time.sleep(2)
     
     logging.info("Бот Kiffis Tunnel успешно запущен...")
-    
-    # 3. Запуск бесконечного опроса Telegram
     bot.infinity_polling(skip_pending=True)
