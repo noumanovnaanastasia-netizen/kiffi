@@ -4,6 +4,7 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from telebot import TeleBot, types
+import database # Импортируем наш файл для работы с Supabase
 
 logging.basicConfig(level=logging.INFO)
 
@@ -12,20 +13,48 @@ bot = TeleBot(BOT_TOKEN)
 
 
 # =====================================================================
-#  ⚙️ ТВОИ ССЫЛКИ ДЛЯ НАСТРОЙКИ (МЕНЯЙ ССЫЛКИ ВНУТРИ КАВЫЧЕК 👇)
+#  ⚙️ ТВОИ НАСТРОЙКИ (МЕНЯЙ ТЕКСТ ВНУТРИ КАВЫЧЕК 👇)
 # =====================================================================
 
-# 1. Твой ГЛАВНЫЙ баннер (который показывается при команде /start)
+# 1. Твой ГЛАВНЫЙ баннер (показывается при команде /start)
 URL_MAIN_IMG = "https://t.me/banerss777/9"
 
 # 2. Твои ссылки на статьи и посты
 URL_INSTRUCTION_POST = "https://t.me/kiffissT/2"
 URL_AGREE = "https://t.me/kiffissT/2"
 
-# 3. Ссылка на твоего ОТДЕЛЬНОГО бота поддержки (замени юзернейм на своего)
-URL_HELP_BOT = "https://t.me/helpkifis_bot"
+# 3. ЮЗ твоего бота поддержки (ОБЯЗАТЕЛЬНО с @ в начале!)
+HELP_BOT_USERNAME = "@helpkifis_bot"
 
 # =====================================================================
+
+clean_username = HELP_BOT_USERNAME.replace("@", "").strip()
+URL_HELP_BOT = f"https://t.me{clean_username}"
+
+
+# --- ТВОЯ ОБНОВЛЕННАЯ БАЗА ПРОМОКОДОВ ---
+# Настоящие ключи выдаются сразу, а коды на баланс начисляют звезды в Supabase!
+PROMO_DATABASE = {
+    # Коды на бесплатные дни (выдают готовые ключи сразу)
+    "FERgJaff6": {"type": "key", "value": "ss://Y2hvbWVkYWhhaGFoYUBteS12cG4tdGVzdC1rZXk6MTIzNDU=#KiffisTunnel-2Days-Combo"},
+    "Ksndbifk":  {"type": "key", "value": "ss://ZnJlZXZwbmZvcmV2ZXJAbXktdnBuLXRlc3Qta2V5OjU0MzIx#KiffisTunnel-1Day-Proxy"},
+    "Kanekfmuygw":{"type": "key", "value": "ss://YW5kcm9pZHZwbmJrZXlobmZzZGJpZmtoYmZzZGJmOjU1NTU=#KiffisTunnel-3Days-Proxy"},
+    "Hosgimaa":  {"type": "key", "value": "vless://white-list-3days-test-key-location-v2ray-ng#KiffisTunnel-3Days-WL"},
+    "ZiXasss":   {"type": "key", "value": "vless://white-list-1day-test-key-location-v2ray-ng#KiffisTunnel-1Day-WL"},
+
+    # Коды на баланс (НАСТОЯЩЕЕ зачисление Звёзд в Supabase!)
+    "K1ffissqop": {"type": "stars", "amount": 5},
+    "Vuuslnh":     {"type": "stars", "amount": 10},
+    "hiskhfie":   {"type": "stars", "amount": 15},
+    "Hshsifoq":   {"type": "stars", "amount": 20},
+    "GooFfsirn":  {"type": "stars", "amount": 30},
+
+    # Купоны на скидки (пока выдают красивый текст для поддержки)
+    "otKraatoo":   {"type": "text", "value": f"🎫 **Купон на скидку -10% к 1-й покупке!**\n\nПерешли это сообщение в поддержку {HELP_BOT_USERNAME}."},
+    "Kiffiss_neabow":{"type": "text", "value": f"🎫 **Купон на скидку -30% к любой покупке!**\n\nПерешли это сообщение в поддержку {HELP_BOT_USERNAME}."},
+    "Goalsshould": {"type": "text", "value": f"🎫 **Купон на скидку -10 Звёзд (при покупке от 30 Stars)!**\n\nПерешли это сообщение в поддержку {HELP_BOT_USERNAME}."},
+    "EREgoEr3":    {"type": "text", "value": f"🎫 **Купон на скидку -20 Звёзд (при покупке от 45 Stars)!**\n\nПерешли это сообщение в поддержку {HELP_BOT_USERNAME}."}
+}
 
 
 # --- ВЕБ-СЕРВЕР ДЛЯ RENDER ---
@@ -46,41 +75,81 @@ def run_web_server():
 # --- ГЛАВНОЕ МЕНЮ ---
 @bot.message_handler(commands=['start'])
 def cmd_start(message):
+    # АВТО-РЕГИСТРАЦИЯ: Записываем пользователя в базу Supabase при старте!
+    database.register_user(message.from_user.id, message.from_user.username)
+    
+    # Пытаемся получить текущий баланс пользователя из базы для красоты
+    user_info = database.get_user_data(message.from_user.id)
+    balance = 0
+    if user_info and len(user_info) > 0:
+        balance = user_info[0].get("balance", 0)
+
     markup = types.InlineKeyboardMarkup()
-    
-    # 1 ряд: VPN и Прокси
-    btn_vpn = types.InlineKeyboardButton("🌐 Просто VPN", callback_data="menu_vpn")
-    btn_proxy = types.InlineKeyboardButton("🧦 Прокси", callback_data="menu_proxy")
-    markup.row(btn_vpn, btn_proxy)
-    
-    # 2 ряд: Белые списки и Комбо
-    btn_wl = types.InlineKeyboardButton("🤍 Белые списки", callback_data="menu_wl")
-    btn_combo = types.InlineKeyboardButton("🔄 VPN + БС (Комбо)", callback_data="menu_combo")
-    markup.row(btn_wl, btn_combo)
-    
-    # 3 ряд: Инструкция и Промокоды
-    btn_ins = types.InlineKeyboardButton("📖 Инструкция", url=URL_INSTRUCTION_POST) 
-    btn_promo = types.InlineKeyboardButton("🎟 Промокоды", callback_data="menu_promo")
-    markup.row(btn_ins, btn_promo)
-    
-    # 4 ряд: Помощь (теперь ведет прямо в бота поддержки) и Соглашение
-    btn_help = types.InlineKeyboardButton("🆘 Помощь", url=URL_HELP_BOT)
-    btn_agree = types.InlineKeyboardButton("📄 Соглашение", url=URL_AGREE)
-    markup.row(btn_help, btn_agree)
+    markup.row(types.InlineKeyboardButton("🌐 Просто VPN", callback_data="menu_vpn"), types.InlineKeyboardButton("🧦 Прокси", callback_data="menu_proxy"))
+    markup.row(types.InlineKeyboardButton("🤍 Белые списки", callback_data="menu_wl"), types.InlineKeyboardButton("🔄 VPN + БС (Комбо)", callback_data="menu_combo"))
+    markup.row(types.InlineKeyboardButton("📖 Инструкция", url=URL_INSTRUCTION_POST), types.InlineKeyboardButton("🎟 Промокоды", callback_data="menu_promo"))
+    markup.row(types.InlineKeyboardButton("🆘 Помощь", url=URL_HELP_BOT), types.InlineKeyboardButton("📄 Соглашение", url=URL_AGREE))
     
     bot.send_photo(
         message.chat.id,
         photo=URL_MAIN_IMG,
-        caption=f"🔮 **Привет, {message.from_user.first_name}!**\n\nДобро пожаловать в туннель *Kiffis Tunnel*.\nВыбери необходимую услугу в меню ниже 👇",
+        caption=f"🔮 **Привет, {message.from_user.first_name}!**\n\n"
+                f"💰 Твой баланс: **{balance} ⭐️ Telegram Stars**\n\n"
+                f"Добро пожаловать в туннель *Kiffis Tunnel*.\nВыбери необходимую услугу в меню ниже 👇",
         reply_markup=markup,
         parse_mode="Markdown"
     )
 
 
-# --- ОБРАБОТКА НАЖАТИЙ (ДЛЯ ОСТАЛЬНЫХ КНОПОК) ---
+# --- ОБРАБОТКА НАЖАТИЙ НА КНОПКИ (CALLBACKS) ---
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callbacks(call):
-    bot.answer_callback_query(call.id, text="Эта функция в разработке 🛠")
+    if call.data == "menu_promo":
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        
+        sent_msg = bot.send_message(
+            call.message.chat.id, 
+            "🎟 **Активация промокода**\n\nВведите секретный промокод в ответном сообщении 👇"
+        )
+        bot.register_next_step_handler(sent_msg, process_promo_code)
+        bot.answer_callback_query(call.id)
+    else:
+        bot.answer_callback_query(call.id, text="Эта функция в разработке 🛠")
+
+
+# --- ЛОГИКА ПРОВЕРКИ ПРОМОКОДА ---
+def process_promo_code(message):
+    user_text = message.text.strip()
+    user_id = message.from_user.id
+    
+    if user_text in PROMO_DATABASE:
+        promo_data = PROMO_DATABASE[user_text]
+        
+        if promo_data["type"] == "key":
+            # Выдаем готовый VPN ключ
+            success_text = f"🎉 **Промокод успешно активирован!**\n\n🎁 Держи твой тестовый ключ:\n\n`{promo_data['value']}`"
+            bot.send_message(message.chat.id, success_text, parse_mode="Markdown")
+            
+        elif promo_data["type"] == "stars":
+            # НАСТОЯЩЕЕ зачисление звезд на баланс в базу!
+            amount = promo_data["amount"]
+            success = database.add_stars_to_balance(user_id, amount)
+            
+            if success:
+                success_text = f"🎉 **Успешно!**\n\nНа твой баланс начислено **+{amount} ⭐️ Telegram Stars** в базу данных Supabase!"
+            else:
+                success_text = "❌ Произошла ошибка при обновлении баланса в базе. Обратитесь в поддержку."
+            bot.send_message(message.chat.id, success_text, parse_mode="Markdown")
+            
+        elif promo_data["type"] == "text":
+            # Выдаем купон для саппорта
+            bot.send_message(message.chat.id, f"🎉 **Промокод распознан!**\n\n{promo_data['value']}", parse_mode="Markdown")
+    else:
+        bot.send_message(
+            message.chat.id, 
+            "❌ **Такого промокода не существует!**\n\nПопробуйте снова через меню `/start`.",
+            parse_mode="Markdown"
+        )
 
 
 if __name__ == "__main__":
