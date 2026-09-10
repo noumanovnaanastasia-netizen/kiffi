@@ -4,7 +4,7 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from telebot import TeleBot, types
-import database # Импортируем наш файл для работы с Supabase
+import database  # Подключаем наш рабочий database.py
 
 logging.basicConfig(level=logging.INFO)
 
@@ -13,17 +13,15 @@ bot = TeleBot(BOT_TOKEN)
 
 
 # =====================================================================
-#  ⚙️ ТВОИ НАСТРОЙКИ (МЕНЯЙ ТЕКСТ ВНУТРИ КАВЫЧЕК 👇)
+#  ⚙️ ТВОИ НАСТРОЙКИ (ВСТАВЬ СВОИ ССЫЛКИ ВНУТРИ КАВЫЧЕК 👇)
 # =====================================================================
+ 
 
-# 1. Твой ГЛАВНЫЙ баннер (показывается при команде /start)
 URL_MAIN_IMG = "https://t.me/banerss777/9"
 
-# 2. Твои ссылки на статьи и посты
-URL_INSTRUCTION_POST = "https://t.me/kiffissT/2"
+URL_INSTRUCTION_POST = "https://t.me/kiffissT/2" 
 URL_AGREE = "https://t.me/kiffissT/2"
 
-# 3. ЮЗ твоего бота поддержки (ОБЯЗАТЕЛЬНО с @ в начале!)
 HELP_BOT_USERNAME = "@helpkifis_bot"
 
 # =====================================================================
@@ -33,7 +31,6 @@ URL_HELP_BOT = f"https://t.me{clean_username}"
 
 
 # --- ТВОЯ ОБНОВЛЕННАЯ БАЗА ПРОМОКОДОВ ---
-# Настоящие ключи выдаются сразу, а коды на баланс начисляют звезды в Supabase!
 PROMO_DATABASE = {
     # Коды на бесплатные дни (выдают готовые ключи сразу)
     "FERgJaff6": {"type": "key", "value": "ss://Y2hvbWVkYWhhaGFoYUBteS12cG4tdGVzdC1rZXk6MTIzNDU=#KiffisTunnel-2Days-Combo"},
@@ -49,7 +46,7 @@ PROMO_DATABASE = {
     "Hshsifoq":   {"type": "stars", "amount": 20},
     "GooFfsirn":  {"type": "stars", "amount": 30},
 
-    # Купоны на скидки (пока выдают красивый текст для поддержки)
+    # Купоны на скидки (выдают красивый текст для поддержки)
     "otKraatoo":   {"type": "text", "value": f"🎫 **Купон на скидку -10% к 1-й покупке!**\n\nПерешли это сообщение в поддержку {HELP_BOT_USERNAME}."},
     "Kiffiss_neabow":{"type": "text", "value": f"🎫 **Купон на скидку -30% к любой покупке!**\n\nПерешли это сообщение в поддержку {HELP_BOT_USERNAME}."},
     "Goalsshould": {"type": "text", "value": f"🎫 **Купон на скидку -10 Звёзд (при покупке от 30 Stars)!**\n\nПерешли это сообщение в поддержку {HELP_BOT_USERNAME}."},
@@ -75,14 +72,20 @@ def run_web_server():
 # --- ГЛАВНОЕ МЕНЮ ---
 @bot.message_handler(commands=['start'])
 def cmd_start(message):
-    # АВТО-РЕГИСТРАЦИЯ: Записываем пользователя в базу Supabase при старте!
-    database.register_user(message.from_user.id, message.from_user.username)
-    
-    # Пытаемся получить текущий баланс пользователя из базы для красоты
-    user_info = database.get_user_data(message.from_user.id)
     balance = 0
-    if user_info and len(user_info) > 0:
-        balance = user_info[0].get("balance", 0)
+    try:
+        # Авто-регистрация в таблице Kiffi
+        database.register_user(message.from_user.id, message.from_user.username)
+        
+        # Получаем данные из Supabase
+        user_info = database.get_user_data(message.from_user.id)
+        
+        # Безопасно вытаскиваем баланс из первой строчки списка [{...}]
+        if user_info and isinstance(user_info, list) and len(user_info) > 0:
+            balance = user_info[0].get("balance", 0)
+    except Exception as e:
+        logging.error(f"Сбой при получении баланса: {e}")
+        balance = 0
 
     markup = types.InlineKeyboardMarkup()
     markup.row(types.InlineKeyboardButton("🌐 Просто VPN", callback_data="menu_vpn"), types.InlineKeyboardButton("🧦 Прокси", callback_data="menu_proxy"))
@@ -105,7 +108,10 @@ def cmd_start(message):
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callbacks(call):
     if call.data == "menu_promo":
-        bot.delete_message(call.message.chat.id, call.message.message_id)
+        try:
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+        except Exception:
+            pass
         
         sent_msg = bot.send_message(
             call.message.chat.id, 
@@ -126,23 +132,18 @@ def process_promo_code(message):
         promo_data = PROMO_DATABASE[user_text]
         
         if promo_data["type"] == "key":
-            # Выдаем готовый VPN ключ
             success_text = f"🎉 **Промокод успешно активирован!**\n\n🎁 Держи твой тестовый ключ:\n\n`{promo_data['value']}`"
             bot.send_message(message.chat.id, success_text, parse_mode="Markdown")
             
         elif promo_data["type"] == "stars":
-            # НАСТОЯЩЕЕ зачисление звезд на баланс в базу!
             amount = promo_data["amount"]
-            success = database.add_stars_to_balance(user_id, amount)
+            # Зачисляем звезды в базу данных
+            database.add_stars_to_balance(user_id, amount)
             
-            if success:
-                success_text = f"🎉 **Успешно!**\n\nНа твой баланс начислено **+{amount} ⭐️ Telegram Stars** в базу данных Supabase!"
-            else:
-                success_text = "❌ Произошла ошибка при обновлении баланса в базе. Обратитесь в поддержку."
+            success_text = f"🎉 **Успешно!**\n\nНа твой баланс начислено **+{amount} ⭐️ Telegram Stars**!"
             bot.send_message(message.chat.id, success_text, parse_mode="Markdown")
             
         elif promo_data["type"] == "text":
-            # Выдаем купон для саппорта
             bot.send_message(message.chat.id, f"🎉 **Промокод распознан!**\n\n{promo_data['value']}", parse_mode="Markdown")
     else:
         bot.send_message(
