@@ -1,62 +1,60 @@
-import os
-import requests
 import logging
 
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+# Простая база данных в оперативной памяти 
+# Хранит информацию в формате: { user_id: { "used_trial": True/False, "expire_date": datetime, "balance": 0 } }
+_USERS_DB = {}
 
-# Настройка заголовков для авторизации в Supabase
-HEADERS = {
-    "apikey": SUPABASE_KEY,
-    "Authorization": f"Bearer {SUPABASE_KEY}",
-    "Content-Type": "application/json",
-    "Prefer": "return=representation"
-}
-
-def register_user(user_id: int, username: str):
-    """Проверяет пользователя в базе Kiffi. Если его нет — регистрирует."""
-    url = f"{SUPABASE_URL}/rest/v1/Kiffi?user_id=eq.{user_id}"
-    try:
-        response = requests.get(url, headers=HEADERS)
-        if response.status_code == 200 and not response.json():
-            # Пользователя нет в БД -> создаем запись
-            insert_url = f"{SUPABASE_URL}/rest/v1/Kiffi"
-            data = {
-                "user_id": user_id,
-                "username": username or "Unknown",
-                "balance": 0,
-                "vpn_until": None
-            }
-            requests.post(insert_url, headers=HEADERS, json=data)
-            logging.info(f"Пользователь {user_id} успешно добавлен в базу Kiffi!")
-    except Exception as e:
-        logging.error(f"Ошибка при регистрации в Supabase: {e}")
-
-def get_user_data(user_id: int):
-    """Получает все данные пользователя из базы Kiffi."""
-    url = f"{SUPABASE_URL}/rest/v1/Kiffi?user_id=eq.{user_id}"
-    try:
-        response = requests.get(url, headers=HEADERS)
-        if response.status_code == 200 and response.json():
-            return response.json()[0] # Возвращаем первую строку с данными
-    except Exception as e:
-        logging.error(f"Ошибка получения данных из Supabase: {e}")
-    return None
-
-def add_stars_to_balance(user_id: int, stars_amount: int):
-    """Начисляет Звёзды на баланс пользователя в базе Kiffi."""
-    user_data = get_user_data(user_id)
-    if not user_data:
-        return False
+def register_user(user_id, username):
+    """Регистрирует нового пользователя, если его нет в базе, и ВСЕГДА возвращает его данные"""
+    if user_id not in _USERS_DB:
+        _USERS_DB[user_id] = {
+            "username": username,
+            "used_trial": False,
+            "expire_date": None,
+            "balance": 0
+        }
+        logging.info(f"DB: Пользователь {user_id} (@{username}) успешно зарегистрирован.")
     
-    current_balance = user_data.get("balance", 0)
-    new_balance = current_balance + stars_amount
-    
-    url = f"{SUPABASE_URL}/rest/v1/Kiffi?user_id=eq.{user_id}"
-    data = {"balance": new_balance}
-    try:
-        res = requests.patch(url, headers=HEADERS, json=data)
-        return res.status_code in [200, 201, 204]
-    except Exception as e:
-        logging.error(f"Ошибка обновления баланса: {e}")
-        return False
+    # Исправлено: теперь данные возвращаются всегда, даже при повторном старте
+    return _USERS_DB[user_id]
+
+def get_user_data(user_id):
+    """Возвращает данные пользователя по его ID. Если пользователя нет, возвращает пустой словарь во избежание NoneType ошибок"""
+    return _USERS_DB.get(user_id, {
+        "username": "Пользователь",
+        "used_trial": False,
+        "expire_date": None,
+        "balance": 0
+    })
+
+def update_user_trial_status(user_id, used_trial=True):
+    """Обновляет статус использования бесплатного триала"""
+    if user_id in _USERS_DB:
+        _USERS_DB[user_id]["used_trial"] = used_trial
+        return True
+    return False
+
+def update_user_subscription(user_id, expire_date):
+    """Обновляет дату окончания платной подписки пользователя"""
+    if user_id in _USERS_DB:
+        _USERS_DB[user_id]["expire_date"] = expire_date
+        return True
+    return False
+
+def get_all_active_users():
+    """Возвращает список всех пользователей, у которых установлена дата окончания подписки"""
+    active_users = []
+    for uid, data in _USERS_DB.items():
+        if data.get("expire_date") is not None:
+            active_users.append({
+                "user_id": uid,
+                "expire_date": data["expire_date"]
+            })
+    return active_users
+
+def deactivate_user_subscription(user_id):
+    """Сбрасывает подписку пользователя при истечении срока"""
+    if user_id in _USERS_DB:
+        _USERS_DB[user_id]["expire_date"] = None
+        return True
+    return False
