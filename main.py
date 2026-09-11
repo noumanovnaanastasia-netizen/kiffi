@@ -32,19 +32,19 @@ if not BOT_TOKEN:
 bot = telebot.TeleBot(BOT_TOKEN)
 
 # 4. ДАННЫЕ О ССЫЛКАХ И БАННЕРАХ
-URL_MAIN_IMG = "https://t.me"         # Главный котик
-URL_TARIFFS_IMG = "https://t.me"     # Баннер выбора дней (Шаг 1)
-URL_DEVICES_IMG = "https://t.me"     # Баннер выбора устройств (Шаг 2)
-URL_FINAL_IMG = "https://t.me"       # Финальный чек оплаты (Шаг 3)
-URL_PROMO_IMG = "https://t.me"       # Раздел промокодов и триала
+URL_MAIN_IMG = "https://t.me/banerss777/9"        # Главный котик
+URL_TARIFFS_IMG = "https://t.me/banerss777/8"     # Баннер выбора дней (Шаг 1)
+URL_DEVICES_IMG = "https://t.me/banerss777/8"     # Баннер выбора устройств (Шаг 2)
+URL_FINAL_IMG = "https://t.me/banerss777/8"       # Финальный чек оплаты (Шаг 3)
+URL_PROMO_IMG = "https://t.me/banerss777/6"       # Раздел промокодов и триала
 
-URL_INSTRUCTION_POST = "https://t.me"
-URL_AGREE = "https://t.me"
+URL_INSTRUCTION_POST = "https://t.me/kiffissT/2"
+URL_AGREE = "https://t.me/kiffissT/2"
 HELP_BOT_USERNAME = "@helpkifis_bot"
 
 # Репозитории на GitHub с вашими ключами (Замените на свои RAW ссылки)
-URL_VPN_GITHUB = "https://githubusercontent.com"
-URL_WHITE_GITHUB = "https://githubusercontent.com"
+URL_VPN_GITHUB = "https://github.com/AvenCores/goida-vpn-configs"
+URL_WHITE_GITHUB = "https://github.com/igareck/vpn-configs-for-russia"
 
 # Статический список ваших личных прокси-серверов
 MY_STATIC_PROXIES = [
