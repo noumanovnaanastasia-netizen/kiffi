@@ -2,67 +2,174 @@ import os
 import logging
 import threading
 import time
+import random
+import urllib.request
+from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from telebot import TeleBot, types
+import telebot
+from telebot import types
 
-# Пытаемся импортировать базу данных. Если файла еще нет, бот не упадет.
+# 1. НАСТРОЙКА ЛОГИРОВАНИЯ
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+
+# 2. ПОДКЛЮЧЕНИЕ БАЗЫ ДАННЫХ
 try:
     import database
     HAS_DATABASE = True
+    logging.info("Система: Локальная база данных успешно подключена.")
 except ImportError:
     HAS_DATABASE = False
+    logging.warning("Система: Файл database.py не найден. Бот работает без сохранения триалов!")
 
-logging.basicConfig(level=logging.INFO)
-
+# 3. ИНИЦИАЛИЗАЦИЯ БОТА
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-bot = TeleBot(BOT_TOKEN)
+if not BOT_TOKEN:
+    BOT_TOKEN = "ВАШ_ТОКЕН_БОТА" 
 
+bot = telebot.TeleBot(BOT_TOKEN)
 
-# =====================================================================
-#  ⚙️ ТВОИ НАСТРОЙКИ (ВСТАВЬ СВОИ ССЫЛКИ ВНУТРИ КАВЫЧЕК 👇)
-# =====================================================================
+# 4. ДАННЫЕ О ССЫЛКАХ И БАННЕРАХ
+URL_MAIN_IMG = "https://t.me"         # Главный котик
+URL_TARIFFS_IMG = "https://t.me"     # Баннер выбора дней (Шаг 1)
+URL_DEVICES_IMG = "https://t.me"     # Баннер выбора устройств (Шаг 2)
+URL_FINAL_IMG = "https://t.me"       # Финальный чек оплаты (Шаг 3)
+URL_PROMO_IMG = "https://t.me"       # Раздел промокодов и триала
 
-# 1. Твой ГЛАВНЫЙ баннер (показывается при команде /start)
-URL_MAIN_IMG = "https://t.me/banerss777/9"
-
-# 2. Твои ссылки на статьи и посты
-URL_INSTRUCTION_POST = "https://t.me/kiffissT/2"
-URL_AGREE = "https://t.me/kiffissT/2"
-
-# 3. ЮЗ твоего бота поддержки (ОБЯЗАТЕЛЬНО с @ в начале!)
+URL_INSTRUCTION_POST = "https://t.me"
+URL_AGREE = "https://t.me"
 HELP_BOT_USERNAME = "@helpkifis_bot"
 
-# =====================================================================
+# Репозитории на GitHub с вашими ключами (Замените на свои RAW ссылки)
+URL_VPN_GITHUB = "https://githubusercontent.com"
+URL_WHITE_GITHUB = "https://githubusercontent.com"
 
-clean_username = HELP_BOT_USERNAME.replace("@", "").strip()
-URL_HELP_BOT = f"https://t.me/helpkifis_bot"
+# Статический список ваших личных прокси-серверов
+MY_STATIC_PROXIES = [
+    "socks5://user:pass@192.168.1.1:1080",
+    "socks5://user:pass@192.168.1.2:1080"
+]
 
-
-# --- ТВОЯ ОБНОВЛЕННАЯ БАЗА ПРОМОКОДОВ ---
-PROMO_DATABASE = {
-    # Коды на бесплатные дни (выдают готовые ключи сразу)
-    "FERgJaff6": {"type": "key", "value": "ss://Y2hvbWVkYWhhaGFoYUBteS12cG4tdGVzdC1rZXk6MTIzNDU=#KiffisTunnel-2Days-Combo"},
-    "Ksndbifk":  {"type": "key", "value": "ss://ZnJlZXZwbmZvcmV2ZXJAbXktdnBuLXRlc3Qta2V5OjU0MzIx#KiffisTunnel-1Day-Proxy"},
-    "Kanekfmuygw":{"type": "key", "value": "ss://YW5kcm9pZHZwbmJrZXlobmZzZGJpZmtoYmZzZGJmOjU1NTU=#KiffisTunnel-3Days-Proxy"},
-    "Hosgimaa":  {"type": "key", "value": "vless://white-list-3days-test-key-location-v2ray-ng#KiffisTunnel-3Days-WL"},
-    "ZiXasss":   {"type": "key", "value": "vless://white-list-1day-test-key-location-v2ray-ng#KiffisTunnel-1Day-WL"},
-
-    # Коды на баланс (НАСТОЯЩЕЕ зачисление Звёзд в Supabase!)
-    "K1ffissqop": {"type": "stars", "amount": 5},
-    "Vuuslnh":     {"type": "stars", "amount": 10},
-    "hiskhfie":   {"type": "stars", "amount": 15},
-    "Hshsifoq":   {"type": "stars", "amount": 20},
-    "GooFfsirn":  {"type": "stars", "amount": 30},
-
-    # Купоны на скидки (выдают красивый текст для поддержки)
-    "otKraatoo":   {"type": "text", "value": f"🎫 **Купон на скидку -10% к 1-й покупке!**\n\nПерешли это сообщение в поддержку {HELP_BOT_USERNAME}."},
-    "Kiffiss_neabow":{"type": "text", "value": f"🎫 **Купон на скидку -30% к любой покупке!**\n\nПерешли это сообщение в поддержку {HELP_BOT_USERNAME}."},
-    "Goalsshould": {"type": "text", "value": f"🎫 **Купон на скидку -10 Звёзд (при покупке от 30 Stars)!**\n\nПерешли это сообщение в поддержку {HELP_BOT_USERNAME}."},
-    "EREgoEr3":    {"type": "text", "value": f"🎫 **Купон на скидку -20 Звёзд (при покупке от 45 Stars)!**\n\nПерешли это сообщение в поддержку {HELP_BOT_USERNAME}."}
+# 5. СЕТКА ТАРИФОВ И СТОИМОСТЬ В TELEGRAM STARS ⭐️
+TARIF_DATA = {
+    "proxy": {
+        "name": "🚀 Скоростные Прокси",
+        "days": {
+            3: {"base_price": 7, "text": "🗓 3 дня — 7 ⭐️"},
+            14: {"base_price": 18, "text": "🗓 14 дней — 18 ⭐️"},
+            30: {"base_price": 30, "text": "🗓 1 месяц — 30 ⭐️"},
+            60: {"base_price": 50, "text": "🗓 2 месяца — 50 ⭐️"},
+            90: {"base_price": 70, "text": "🗓 3 месяца — 70 ⭐️"},
+            150: {"base_price": 110, "text": "🗓 5 месяцев — 110 ⭐️"}
+        },
+        "devices": {
+            1: {"mult": 1.0, "text": "📱 1 устройство"},
+            2: {"mult": 1.4, "text": "📱 2 устройства (Скидка!)"},
+            5: {"mult": 2.0, "text": "📱 5 устройств (Мега-скидка!)"}
+        }
+    },
+    "vpn": {
+        "name": "🌐 Защищенный Просто VPN",
+        "days": {
+            3: {"base_price": 7, "text": "🗓 3 дня — 7 ⭐️"},
+            14: {"base_price": 18, "text": "🗓 14 дней — 18 ⭐️"},
+            30: {"base_price": 30, "text": "🗓 1 месяц — 30 ⭐️"},
+            60: {"base_price": 50, "text": "🗓 2 месяца — 50 ⭐️"},
+            90: {"base_price": 70, "text": "🗓 3 месяца — 70 ⭐️"},
+            150: {"base_price": 110, "text": "🗓 5 месяцев — 110 ⭐️"}
+        },
+        "devices": {
+            1: {"mult": 1.0, "text": "📱 1 устройство"},
+            2: {"mult": 1.4, "text": "📱 2 устройства (Скидка!)"},
+            5: {"mult": 2.0, "text": "📱 5 устройств (Мега-скидка!)"}
+        }
+    },
+    "white": {
+        "name": "⚪️ Приоритетные Белые Списки",
+        "days": {
+            3: {"base_price": 10, "text": "🗓 3 дня — 10 ⭐️"},
+            14: {"base_price": 22, "text": "🗓 14 дней — 22 ⭐️"},
+            30: {"base_price": 36, "text": "🗓 1 месяц — 36 ⭐️"},
+            60: {"base_price": 60, "text": "🗓 2 месяца — 60 ⭐️"},
+            90: {"base_price": 80, "text": "🗓 3 месяца — 80 ⭐️"},
+            150: {"base_price": 130, "text": "🗓 5 месяцев — 130 ⭐️"}
+        },
+        "devices": {
+            1: {"mult": 1.0, "text": "📱 1 устройство"},
+            2: {"mult": 1.4, "text": "📱 2 устройства (Скидка!)"},
+            5: {"mult": 2.0, "text": "📱 5 устройств (Мега-скидка!)"}
+        }
+    },
+    "combo": {
+        "name": "🔥 Всё включено (КОМБО-Тариф)",
+        "days": {
+            3: {"base_price": 10, "text": "🗓 3 дня — 10 ⭐️"},
+            14: {"base_price": 22, "text": "🗓 14 дней — 22 ⭐️"},
+            30: {"base_price": 36, "text": "🗓 1 месяц — 36 ⭐️"},
+            60: {"base_price": 60, "text": "🗓 2 месяца — 60 ⭐️"},
+            90: {"base_price": 80, "text": "🗓 3 месяца — 80 ⭐️"},
+            150: {"base_price": 130, "text": "🗓 5 месяцев — 130 ⭐️"}
+        },
+        "devices": {
+            1: {"mult": 1.0, "text": "📱 1 устройство"},
+            2: {"mult": 1.4, "text": "📱 2 устройства (Скидка!)"},
+            5: {"mult": 2.0, "text": "📱 5 устройств (Мега-скидка!)"}
+        }
+    }
 }
+# =====================================================================
+# 6. ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ И ФОНОВЫЕ ПОТОКИ (ПИНГ И КРОН)
+# =====================================================================
+def get_keys_from_github(url, count=2):
+    """Скачивает текстовый файл с GitHub и выбирает случайные строки"""
+    try:
+        with urllib.request.urlopen(url, timeout=5) as response:
+            content = response.read().decode('utf-8')
+        lines = [line.strip() for line in content.splitlines() if line.strip()]
+        return random.sample(lines, min(len(lines), count))
+    except Exception as e:
+        logging.error(f"Ошибка чтения GitHub: {e}")
+        return []
 
+def keep_alive_ping():
+    """Фоновый поток само-пинга, защищающий Render от засыпания"""
+    RENDER_URL = "https://onrender.com" 
+    while True:
+        try:
+            urllib.request.urlopen(RENDER_URL)
+            logging.info("Пинг-Воркер: Успешный пинг. Сервер бодрствует!")
+        except Exception as e:
+            logging.error(f"Пинг-Воркер: Ошибка пинга: {e}")
+        time.sleep(600)
 
-# --- ВЕБ-СЕРВЕР ДЛЯ RENDER ---
+def check_expired_subscriptions():
+    """Фоновый проверяльщик истекших подписок (срабатывает раз в час)"""
+    while True:
+        try:
+            if HAS_DATABASE:
+                active_users = database.get_all_active_users()
+                now = datetime.now()
+                for user in active_users:
+                    uid = user["user_id"]
+                    expire_date = user["expire_date"]
+                    if expire_date and now > expire_date:
+                        database.deactivate_user_subscription(uid)
+                        try:
+                            bot.send_message(
+                                uid,
+                                "🚨 **Срок действия вашей подписки истек.**\n\n"
+                                "Ваш туннель автоматически деактивирован. "
+                                "Вы можете мгновенно продлить её в главном меню бота! ⭐️",
+                                parse_mode="Markdown"
+                            )
+                        except Exception:
+                            pass
+        except Exception as e:
+            logging.error(f"Крон-Воркер: Ошибка проверки лимитов: {e}")
+        time.sleep(3600)
+
 class WebServer(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -70,132 +177,194 @@ class WebServer(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write("Kiffis Tunnel работает!".encode("utf-8"))
 
-def keep_alive_ping():
-    import urllib.request
-    RENDER_URL = "https://kiffi.onrender.com"
-    while True:
-        try:
-            urllib.request.urlopen(RENDER_URL)
-            logging.info("Само-пинг выполнен успешно. Сервер бодрствует!")
-        except Exception as e:
-            logging.error(f"Ошибка само-пинга: {e}")
-        time.sleep(600)
-
-
-
 def run_web_server():
     from http.server import HTTPServer
     port = int(os.getenv("PORT", 8080))
     server = HTTPServer(("0.0.0.0", port), WebServer)
-    logging.info(f"Веб-сервер запущен на порту {port}")
+    logging.info(f"Сервер: Веб-интерфейс развернут на порту {port}")
     threading.Thread(target=keep_alive_ping, daemon=True).start()
+    threading.Thread(target=check_expired_subscriptions, daemon=True).start()
     server.serve_forever()
 
+# =====================================================================
+# 7. ЛОГИКА ИНТЕРФЕЙСА ТЕЛЕГРАМ (КНОПКИ И ОБРАБОТЧИКИ)
+# =====================================================================
+def get_main_menu_keyboard():
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    help_url = f"https://t.me{HELP_BOT_USERNAME.replace('@','')}" if not HELP_BOT_USERNAME.startswith('http') else HELP_BOT_USERNAME
+    markup.add(
+        types.InlineKeyboardButton(text="🌐 Просто VPN", callback_data="vpn_click"),
+        types.InlineKeyboardButton(text="🦫 Прокси", callback_data="proxy_click"),
+        types.InlineKeyboardButton(text="🤍 Белые списки", callback_data="white_click"),
+        types.InlineKeyboardButton(text="🌌 VPN + БС (Комбо)", callback_data="combo_click"),
+        types.InlineKeyboardButton(text="📖 Инструкция ↗️", url=URL_INSTRUCTION_POST),
+        types.InlineKeyboardButton(text="🎁 Промокоды", callback_data="promo_click"),
+        types.InlineKeyboardButton(text="🆘 Помощь ↗️", url=help_url),
+        types.InlineKeyboardButton(text="📄 Соглашение ↗️", url=URL_AGREE)
+    )
+    return markup
 
-
-# --- ГЛАВНОЕ МЕНЮ ---
 @bot.message_handler(commands=['start'])
 def cmd_start(message):
-    balance = 0
-    
-    # Безопасная работа с базой данных через подушку безопасности
-    if HAS_DATABASE:
-        try:
-            # Пытаемся зарегистрировать пользователя в таблице Kiffi
-            database.register_user(message.from_user.id, message.from_user.username)
-            
-            # Пытаемся получить его актуальные данные
-            user_info = database.get_user_data(message.from_user.id)
-            
-            # Безопасно вытаскиваем баланс из первой строчки ответа базы данных
-            if user_info and isinstance(user_info, list) and len(user_info) > 0:
-                balance = user_info[0].get("balance", 0)
-        except Exception as e:
-            logging.error(f"Скрытая ошибка базы данных: {e}")
-            balance = 0 # Если база упала, просто показываем баланс 0 и не ломаем бота
-
-    markup = types.InlineKeyboardMarkup()
-    markup.row(types.InlineKeyboardButton("🌐 Просто VPN", callback_data="menu_vpn"), types.InlineKeyboardButton("🧦 Прокси", callback_data="menu_proxy"))
-    markup.row(types.InlineKeyboardButton("🤍 Белые списки", callback_data="menu_wl"), types.InlineKeyboardButton("🔄 VPN + БС (Комбо)", callback_data="menu_combo"))
-    markup.row(types.InlineKeyboardButton("📖 Инструкция", url=URL_INSTRUCTION_POST), types.InlineKeyboardButton("🎟 Промокоды", callback_data="menu_promo"))
-    markup.row(types.InlineKeyboardButton("🆘 Помощь", url=URL_HELP_BOT), types.InlineKeyboardButton("📄 Соглашение", url=URL_AGREE))
-    
-    bot.send_photo(
-        message.chat.id,
-        photo=URL_MAIN_IMG,
-        caption=f"🔮 **Привет, {message.from_user.first_name}!**\n\n"
-                f"💰 Твой баланс: **{balance} ⭐️ Telegram Stars**\n\n"
-                f"Добро пожаловать в туннель *Kiffis Tunnel*.\nВыбери необходимую услугу в меню ниже 👇",
-        reply_markup=markup,
-        parse_mode="Markdown"
-    )
-
-
-# --- ОБРАБОТКА НАЖАТИЙ НА КНОПКИ (CALLBACKS) ---
-@bot.callback_query_handler(func=lambda call: True)
-def handle_callbacks(call):
-    if call.data == "menu_promo":
-        try:
-            bot.delete_message(call.message.chat.id, call.message.message_id)
-        except Exception:
-            pass
-        
-        sent_msg = bot.send_message(
-            call.message.chat.id, 
-            "🎟 **Активация промокода**\n\nВведите секретный промокод в ответном сообщении 👇"
-        )
-        bot.register_next_step_handler(sent_msg, process_promo_code)
-        bot.answer_callback_query(call.id)
-    else:
-        bot.answer_callback_query(call.id, text="Эта функция в разработке 🛠")
-
-
-# --- ЛОГИКА ПРОВЕРКИ ПРОМОКОДА ---
-def process_promo_code(message):
-    user_text = message.text.strip()
     user_id = message.from_user.id
-    
-    if user_text in PROMO_DATABASE:
-        promo_data = PROMO_DATABASE[user_text]
-        
-        if promo_data["type"] == "key":
-            success_text = f"🎉 **Промокод успешно активирован!**\n\n🎁 Держи твой тестовый ключ:\n\n`{promo_data['value']}`"
-            bot.send_message(message.chat.id, success_text, parse_mode="Markdown")
-            
-        elif promo_data["type"] == "stars":
-            amount = promo_data["amount"]
-            
-            # Безопасное начисление звезд в базу данных
-            if HAS_DATABASE:
-                try:
-                    database.add_stars_to_balance(user_id, amount)
-                except Exception as e:
-                    logging.error(f"Не удалось начислить звезды в БД: {e}")
-            
-            success_text = f"🎉 **Успешно!**\n\nНа твой баланс начислено **+{amount} ⭐️ Telegram Stars**!"
-            bot.send_message(message.chat.id, success_text, parse_mode="Markdown")
-            
-        elif promo_data["type"] == "text":
-            bot.send_message(message.chat.id, f"🎉 **Промокод распознан!**\n\n{promo_data['value']}", parse_mode="Markdown")
-    else:
-        bot.send_message(
-            message.chat.id, 
-            "❌ **Такого промокода не существует!**\n\nПопробуйте снова через меню `/start`.",
-            parse_mode="Markdown"
-        )
+    username = message.from_user.username or "Пользователь"
+    balance = 0
+    if HAS_DATABASE:
+        user_data = database.register_user(user_id, username)
+        balance = user_data.get("balance", 0)
 
+    welcome_text = (
+        f"🔮 **Привет, {message.from_user.first_name}!**\n\n"
+        f"💰 Твой баланс: {balance} ⭐️ Telegram Stars\n\n"
+        f"Добро пожаловать в туннель **Kiffis Tunnel**.\n"
+        f"Выбери необходимую услугу в меню ниже 👇"
+    )
+    bot.send_photo(chat_id=message.chat.id, photo=URL_MAIN_IMG, caption=welcome_text, reply_markup=get_main_menu_keyboard(), parse_mode="Markdown")
+# --- ПОШАГОВЫЙ КАЛЬКУЛЯТОР ТАРИФОВ С УЧЁТОМ МЕДИА-БАННЕРОВ ---
 
-if __name__ == "__main__":
-    web_thread = threading.Thread(target=run_web_server, daemon=True)
-    web_thread.start()
+@bot.callback_query_handler(func=lambda call: call.data in ["proxy_click", "vpn_click", "white_click", "combo_click"])
+def tariff_step_1_days(call):
+    service_map = {"proxy_click": "proxy", "vpn_click": "vpn", "white_click": "white", "combo_click": "combo"}
+    srv = service_map[call.data]
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    for days, info in TARIF_DATA[srv]["days"].items():
+        markup.add(types.InlineKeyboardButton(text=info["text"], callback_data=f"ts2:{srv}:{days}"))
+    markup.add(types.InlineKeyboardButton(text="⬅️ В главное меню", callback_data="back_to_main"))
     
-    logging.info("Сброс старых сессий Telegram...")
+    text = f"💳 **{TARIF_DATA[srv]['name']}**\n\n**Шаг 1 из 2:** Выберите необходимый срок действия подписки из тарифной сетки:"
+    
+    # Плавное переключение на баннер тарифов
     try:
-        bot.remove_webhook()
-    except Exception as e:
-        logging.warning(f"Не удалось удалить вебхук: {e}")
-        
-    time.sleep(2)
+        bot.edit_message_media(
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            media=types.InputMediaPhoto(URL_TARIFFS_IMG, caption=text, parse_mode="Markdown"),
+            reply_markup=markup
+        )
+    except Exception:
+        bot.edit_message_caption(chat_id=call.message.chat.id, message_id=call.message.message_id, caption=text, reply_markup=markup, parse_mode="Markdown")
+    bot.answer_callback_query(call.id)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("ts2:"))
+def tariff_step_2_devices(call):
+    _, srv, days = call.data.split(":")
+    days = int(days)
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    base_price = TARIF_DATA[srv]["days"][days]["base_price"]
     
-    logging.info("Бот Kiffis Tunnel успешно запущен...")
-    bot.infinity_polling(skip_pending=True)
+    for dev, dev_info in TARIF_DATA[srv]["devices"].items():
+        current_total = int(base_price * dev_info["mult"])
+        markup.add(types.InlineKeyboardButton(text=f"{dev_info['text']} ➡️ {current_total} ⭐️", callback_data=f"ts3:{srv}:{days}:{dev}:{current_total}"))
+        
+    markup.add(types.InlineKeyboardButton(text="⬅️ Назад", callback_data=f"{srv}_click"))
+    text = f"💳 **{TARIF_DATA[srv]['name']}**\n📋 Срок подписки: {days} дней\n\n**Шаг 2 из 2:** Укажите количество подключаемых устройств:"
+    
+    # Плавное переключение на баннер выбора устройств
+    try:
+        bot.edit_message_media(
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            media=types.InputMediaPhoto(URL_DEVICES_IMG, caption=text, parse_mode="Markdown"),
+            reply_markup=markup
+        )
+    except Exception:
+        bot.edit_message_caption(chat_id=call.message.chat.id, message_id=call.message.message_id, caption=text, reply_markup=markup, parse_mode="Markdown")
+    bot.answer_callback_query(call.id)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("ts3:"))
+def tariff_step_3_final(call):
+    _, srv, days, devices, total_price = call.data.split(":")
+    days = int(days)
+    expire_date = (datetime.now() + timedelta(days=days)).strftime("%d.%m.%Y")
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    markup.add(
+        types.InlineKeyboardButton(text=f"🚀 ОПЛАТИТЬ ПАКЕТ ЗА {total_price} ⭐️", callback_data=f"pay_invoice:{srv}:{days}:{devices}:{total_price}"),
+        types.InlineKeyboardButton(text="⚙️ Изменить параметры", callback_data=f"ts2:{srv}:{days}")
+    )
+    
+    text = (
+        f"🛒 **ПОДТВЕРЖДЕНИЕ ЗАКАЗА**\n\n"
+        f"• **Услуга:** {TARIF_DATA[srv]['name']}\n"
+        f"• **Период:** {days} дней\n"
+        f"• **Устройства:** {devices} шт.\n"
+        f"• **Активен до:** `{expire_date}` 📅\n\n"
+        f"💵 **Итого к оплате:** `{total_price}` Telegram Stars ⭐️"
+    )
+    
+    # Плавное переключение на баннер финального чека
+    try:
+        bot.edit_message_media(
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            media=types.InputMediaPhoto(URL_FINAL_IMG, caption=text, parse_mode="Markdown"),
+            reply_markup=markup
+        )
+    except Exception:
+        bot.edit_message_caption(chat_id=call.message.chat.id, message_id=call.message.message_id, caption=text, reply_markup=markup, parse_mode="Markdown")
+    bot.answer_callback_query(call.id)
+
+@bot.callback_query_handler(func=lambda call: call.data == "back_to_main")
+def back_to_main_menu(call):
+    try:
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+    except Exception:
+        pass
+    cmd_start(call.message)
+    bot.answer_callback_query(call.id)
+
+@bot.callback_query_handler(func=lambda call: call.data == "promo_click")
+def handle_trial_and_promos(call):
+    user_id = call.from_user.id
+    has_used_trial = False
+    if HAS_DATABASE:
+        user_info = database.get_user_data(user_id)
+        if user_info:
+            has_used_trial = user_info.get("used_trial", False)
+            
+    if has_used_trial:
+        bot.send_message(call.message.chat.id, "❌ **Пробный период завершен**\n\nВы уже использовали свои бесплатные 3 дня. Продлите подписку в меню! ⭐️")
+        bot.answer_callback_query(call.id)
+        return
+
+    # Загружаем промо-баннер на место котика
+    text_loading = "⏳ Генерируем тестовые ключи на 3 дня..."
+    try:
+        bot.edit_message_media(
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            media=types.InputMediaPhoto(URL_PROMO_IMG, caption=text_loading, parse_mode="Markdown"),
+            reply_markup=types.InlineKeyboardMarkup().add(types.InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_main"))
+        )
+    except Exception:
+        pass
+
+    vpn_keys = get_keys_from_github(URL_VPN_GITHUB, count=2)
+    white_keys = get_keys_from_github(URL_WHITE_GITHUB, count=3)
+    proxy_key = random.choice(MY_STATIC_PROXIES) if MY_STATIC_PROXIES else "Нет свободных прокси"
+
+    output_text = (
+        "🎁 **Ваш бесплатный пробный период (3 дня) АКТИВИРОВАН!**\n\n"
+        f"🍏 **Прокси:** `{proxy_key}`\n\n"
+        "🌐 **VPN (2 шт.):**\n"
+    )
+    for i, k in enumerate(vpn_keys, 1):
+        output_text += f"{i}. `{k}`\n"
+    output_text += "\n⚪️ **Белые списки:**\n"
+    for i, k in enumerate(white_keys, 1):
+        output_text += f"{i}. `{k}`\n"
+
+    bot.send_message(call.message.chat.id, output_text, parse_mode="Markdown")
+    if HAS_DATABASE:
+        database.update_user_trial_status(user_id, used_trial=True)
+        database.update_user_subscription(user_id, datetime.now() + timedelta(days=3))
+    bot.answer_callback_query(call.id)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("pay_invoice:"))
+def execute_payment_invoice(call):
+    bot.send_message(call.message.chat.id, "🏗 Шлюз Stars-инвойсов подготовлен к работе.")
+    bot.answer_callback_query(call.id)
+
+if __name__ == '__main__':
+    threading.Thread(target=run_web_server, daemon=True).start()
+    logging.info("Система: Telegram-бот успешно запущен!")
+    bot.infinity_polling()
