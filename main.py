@@ -18,22 +18,22 @@ except ImportError:
     HAS_DATABASE = False
 
 BOT_TOKEN = os.getenv("BOT_TOKEN") or "ВАШ_ТОКЕН_БОТА"
-ADMIN_ID = 123456789  # ⚠️ ВСТАВЬТЕ СВОЙ ID СЮДА!
+ADMIN_ID = 7303801260  # ⚠️ ВСТАВЬТЕ СВОЙ ID СЮДА!
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
-URL_MAIN_IMG = "https://t.me"         
-URL_TARIFFS_IMG = "https://t.me"     
-URL_DEVICES_IMG = "https://t.me"     
-URL_FINAL_IMG = "https://t.me"       
-URL_PROMO_IMG = "https://t.me"       
+URL_MAIN_IMG = "https://t.me/banerss777/9"
+URL_TARIFFS_IMG = "https://t.me/banerss777/8"
+URL_DEVICES_IMG = "https://t.me/banerss777/8"
+URL_FINAL_IMG = "https://t.me/banerss777/8"      
+URL_PROMO_IMG = "https://t.me/banerss777/6"       
 
-URL_INSTRUCTION_POST = "https://t.me"
-URL_AGREE = "https://t.me"
+URL_INSTRUCTION_POST = "https://t.me/kiffissT/2"
+URL_AGREE = "https://t.me/kiffissT/2"
 HELP_BOT_USERNAME = "@helpkifis_bot"
 
-URL_VPN_GITHUB = "https://githubusercontent.com"
-URL_WHITE_GITHUB = "https://githubusercontent.com"
+URL_VPN_GITHUB = "https://github.com/AvenCores/goida-vpn-configs"
+URL_WHITE_GITHUB = "https://github.com/igareck/vpn-configs-for-russia"
 
 MY_STATIC_PROXIES = ["socks5://kifiss_user:pass123@194.67.212.11:1080"]
 
