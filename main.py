@@ -70,11 +70,27 @@ class WebServer(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write("Kiffis Tunnel работает!".encode("utf-8"))
 
+def keep_alive_ping():
+    import urllib.request
+    RENDER_URL = "https://kiffi.onrender.com"
+    while True:
+        try:
+            urllib.request.urlopen(RENDER_URL)
+            logging.info("Само-пинг выполнен успешно. Сервер бодрствует!")
+        except Exception as e:
+            logging.error(f"Ошибка само-пинга: {e}")
+        time.sleep(600)
+
+
+
 def run_web_server():
+    from http.server import HTTPServer
     port = int(os.getenv("PORT", 8080))
     server = HTTPServer(("0.0.0.0", port), WebServer)
     logging.info(f"Веб-сервер запущен на порту {port}")
+    threading.Thread(target=keep_alive_ping, daemon=True).start()
     server.serve_forever()
+
 
 
 # --- ГЛАВНОЕ МЕНЮ ---
