@@ -35,7 +35,7 @@ HELP_BOT_USERNAME = "@helpkifis_bot"
 # =====================================================================
 
 clean_username = HELP_BOT_USERNAME.replace("@", "").strip()
-URL_HELP_BOT = f"https://t.me{clean_username}"
+URL_HELP_BOT = f"https://t.me/helpkifis_bot"
 
 
 # --- ТВОЯ ОБНОВЛЕННАЯ БАЗА ПРОМОКОДОВ ---
