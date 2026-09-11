@@ -40,7 +40,7 @@ URL_PROMO_IMG = "https://t.me/banerss777/6"       # Раздел промоко�
 
 URL_INSTRUCTION_POST = "https://t.me/kiffissT/2"
 URL_AGREE = "https://t.me/kiffissT/2"
-HELP_BOT_USERNAME = "@helpkifis_bot"
+HELP_BOT_USERNAME = "https://t.me/helpkifis_bot"
 
 # Репозитории на GitHub с вашими ключами (Замените на свои RAW ссылки)
 URL_VPN_GITHUB = "https://github.com/AvenCores/goida-vpn-configs"
