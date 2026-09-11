@@ -4,7 +4,13 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from telebot import TeleBot, types
-import database  # Подключаем наш рабочий database.py
+
+# Пытаемся импортировать базу данных. Если файла еще нет, бот не упадет.
+try:
+    import database
+    HAS_DATABASE = True
+except ImportError:
+    HAS_DATABASE = False
 
 logging.basicConfig(level=logging.INFO)
 
@@ -15,13 +21,15 @@ bot = TeleBot(BOT_TOKEN)
 # =====================================================================
 #  ⚙️ ТВОИ НАСТРОЙКИ (ВСТАВЬ СВОИ ССЫЛКИ ВНУТРИ КАВЫЧЕК 👇)
 # =====================================================================
- 
 
+# 1. Твой ГЛАВНЫЙ баннер (показывается при команде /start)
 URL_MAIN_IMG = "https://t.me/banerss777/9"
 
-URL_INSTRUCTION_POST = "https://t.me/kiffissT/2" 
+# 2. Твои ссылки на статьи и посты
+URL_INSTRUCTION_POST = "https://t.me/kiffissT/2"
 URL_AGREE = "https://t.me/kiffissT/2"
 
+# 3. ЮЗ твоего бота поддержки (ОБЯЗАТЕЛЬНО с @ в начале!)
 HELP_BOT_USERNAME = "@helpkifis_bot"
 
 # =====================================================================
@@ -73,19 +81,22 @@ def run_web_server():
 @bot.message_handler(commands=['start'])
 def cmd_start(message):
     balance = 0
-    try:
-        # Авто-регистрация в таблице Kiffi
-        database.register_user(message.from_user.id, message.from_user.username)
-        
-        # Получаем данные из Supabase
-        user_info = database.get_user_data(message.from_user.id)
-        
-        # Безопасно вытаскиваем баланс из первой строчки списка [{...}]
-        if user_info and isinstance(user_info, list) and len(user_info) > 0:
-            balance = user_info[0].get("balance", 0)
-    except Exception as e:
-        logging.error(f"Сбой при получении баланса: {e}")
-        balance = 0
+    
+    # Безопасная работа с базой данных через подушку безопасности
+    if HAS_DATABASE:
+        try:
+            # Пытаемся зарегистрировать пользователя в таблице Kiffi
+            database.register_user(message.from_user.id, message.from_user.username)
+            
+            # Пытаемся получить его актуальные данные
+            user_info = database.get_user_data(message.from_user.id)
+            
+            # Безопасно вытаскиваем баланс из первой строчки ответа базы данных
+            if user_info and isinstance(user_info, list) and len(user_info) > 0:
+                balance = user_info[0].get("balance", 0)
+        except Exception as e:
+            logging.error(f"Скрытая ошибка базы данных: {e}")
+            balance = 0 # Если база упала, просто показываем баланс 0 и не ломаем бота
 
     markup = types.InlineKeyboardMarkup()
     markup.row(types.InlineKeyboardButton("🌐 Просто VPN", callback_data="menu_vpn"), types.InlineKeyboardButton("🧦 Прокси", callback_data="menu_proxy"))
@@ -137,8 +148,13 @@ def process_promo_code(message):
             
         elif promo_data["type"] == "stars":
             amount = promo_data["amount"]
-            # Зачисляем звезды в базу данных
-            database.add_stars_to_balance(user_id, amount)
+            
+            # Безопасное начисление звезд в базу данных
+            if HAS_DATABASE:
+                try:
+                    database.add_stars_to_balance(user_id, amount)
+                except Exception as e:
+                    logging.error(f"Не удалось начислить звезды в БД: {e}")
             
             success_text = f"🎉 **Успешно!**\n\nНа твой баланс начислено **+{amount} ⭐️ Telegram Stars**!"
             bot.send_message(message.chat.id, success_text, parse_mode="Markdown")
